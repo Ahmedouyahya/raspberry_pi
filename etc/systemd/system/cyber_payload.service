@@ -1,0 +1,12 @@
+[Unit]
+Description=Cybersecurity Payload Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/payload_runner.sh
+Restart=on-failure
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

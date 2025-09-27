@@ -1,0 +1,197 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+env/
+venv/
+.venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Project specific
+*.enc
+*.bin
+/mnt/
+/piusb.bin
+collected_data/
+logs/
+reports/
+
+# Configuration files with sensitive data
+config/device-*.json
+config/network-*.json
+!config/*-template.json
+
+# Test outputs
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Presentation materials (keep sources, ignore builds)
+presentations/*.pdf
+presentations/*.pptx
+docs/_build/
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Raspberry Pi specific
+*.img
+*.img.xz
+*.bin
+/piusb.bin
+
+# Configuration files with sensitive data
+wpa_supplicant.conf
+*.psk
+*.key
+*.pem
+*.crt
+
+# Collected data files (important for security)
+collected_data.enc
+*.enc
+collected_data/
+output/
+results/
+
+# System files
+.ssh/
+*.pid
+*.sock
+
+# Backup files
+*.backup
+*.bak
+*.orig
+
+# Demo and test output
+demo_output/
+test_results/
+logs/
+
+# Hardware specific
+/mnt/
+/sys/
+/proc/
+/dev/
+
+# Package managers
+node_modules/
+.npm
+.yarn/
+
+# Documentation build
+_build/
+_static/
+_templates/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# Raspberry Pi boot files (when working on SD card)
+/boot/
+
+# Local configuration files
+config.local.*
+settings.local.*
+.env.local
+
+# Testing
+.coverage
+.pytest_cache/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Compressed files
+*.zip
+*.tar.gz
+*.rar
+*.7z
