@@ -38,6 +38,7 @@ function New-SafeDirectory {
 }
 
 # Function to copy files safely with error handling
+# Handles locked files (e.g. SQLite databases open by browsers)
 function Copy-SafeFile {
     param(
         [string]$Source,
@@ -47,9 +48,30 @@ function Copy-SafeFile {
     
     try {
         if (Test-Path $Source) {
-            Copy-Item $Source $Destination -ErrorAction Stop
-            if ($Verbose) { Write-Host "Copied $Description from $Source" }
-            return $true
+            try {
+                Copy-Item $Source $Destination -ErrorAction Stop
+                if ($Verbose) { Write-Host "Copied $Description from $Source" }
+                # Also grab WAL/SHM journals for SQLite databases
+                if ($Source -match '\.(db|sqlite)$') {
+                    Copy-Item "$Source-wal" "$Destination-wal" -ErrorAction SilentlyContinue
+                    Copy-Item "$Source-shm" "$Destination-shm" -ErrorAction SilentlyContinue
+                }
+                return $true
+            }
+            catch [System.IO.IOException] {
+                # File is locked — try reading raw bytes as a fallback
+                Write-Warning "$Description is locked by another process, attempting raw copy..."
+                try {
+                    $bytes = [System.IO.File]::ReadAllBytes($Source)
+                    [System.IO.File]::WriteAllBytes($Destination, $bytes)
+                    if ($Verbose) { Write-Host "Copied $Description via raw read" }
+                    return $true
+                }
+                catch {
+                    Write-Warning "Raw copy also failed for $Description`: $($_.Exception.Message)"
+                    return $false
+                }
+            }
         }
         else {
             Write-Warning "$Description not found at $Source"

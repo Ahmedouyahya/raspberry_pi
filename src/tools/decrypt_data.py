@@ -23,9 +23,9 @@ import argparse
 from typing import Dict, Any, Optional
 
 try:
-    from Crypto.Cipher import AES
-    from Crypto.Protocol.KDF import PBKDF2
-    from Crypto.Hash import SHA256
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Protocol.KDF import PBKDF2
+    from Cryptodome.Hash import SHA256
 except ImportError:
     print("Error: pycryptodomex library is required. Install with: pip3 install pycryptodomex")
     sys.exit(1)

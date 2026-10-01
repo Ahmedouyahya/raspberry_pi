@@ -40,11 +40,10 @@ Instead of just reading about cybersecurity, you'll:
 ### 1. Set Up Your Pi Zero
 
 ```bash
-# Download Raspberry Pi OS Lite
-# Flash to SD card using Raspberry Pi Imager
-# Enable SSH and configure WiFi
+# Flash Raspberry Pi OS Lite to SD card using Raspberry Pi Imager
+# Enable SSH and configure Wi-Fi in the imager settings
 
-# Copy our project files
+# Clone the project (on the Pi, or on your computer first)
 git clone https://github.com/Ahmedouyahya/raspberry_pi.git
 cd raspberry_pi
 ```
@@ -52,64 +51,47 @@ cd raspberry_pi
 ### 2. Install Dependencies
 
 ```bash
+# Create a virtual environment (recommended)
+python3 -m venv .venv
+source .venv/bin/activate
+
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Set up the environment
+# Or run the full automated setup on a Pi:
 chmod +x scripts/setup.sh
-./scripts/setup.sh
+sudo ./scripts/setup.sh
 ```
 
 ### 3. Run Your First Test
 
 ```bash
-# Start the educational demo
-python src/main.py --demo
+# Start the educational demo (no hardware needed!)
+python3 src/main.py demo
 
-# Or try the interactive mode
-python decrypt_data.py --demo
-touch /boot/ssh
+# Or try the standalone decryption demo
+python3 decrypt_data.py --demo --analyze
 
-# Configure Wi-Fi
-cat > /boot/wpa_supplicant.conf << EOF
-country=US
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-network={
-    ssid="YOUR_NETWORK_NAME"
-    psk="YOUR_NETWORK_PASSWORD"
-}
-EOF
+# Run the test suite (27 tests)
+python3 -m pytest tests/ -v
 ```
 
-### 3. Configure USB Gadget Mode
+### 4. (Optional) Configure USB Gadget Mode on the Pi
 
-Edit `/boot/config.txt` and add:
-```
+This step is only needed if you want the Pi to act as a USB device.
+
+```bash
+# Edit /boot/config.txt — add:
 dtoverlay=dwc2,dr_mode=peripheral
-gpu_mem=16
-dtparam=act_led_trigger=none
-dtparam=act_led_activelow=on
-disable_splash=1
-```
 
-Edit `/etc/modules` and add:
-```
+# Edit /etc/modules — add:
 dwc2
-g_hid
 g_mass_storage
 ```
 
-### 4. Install and Configure
-
-```bash
-# Clone this repository
-git clone https://github.com/yourusername/pi-zero-cybersec-tool.git
-cd pi-zero-cybersec-tool
-
-# Run the automated setup script
-sudo ./scripts/setup.sh
-```
+> **📖 Full step-by-step guide:** [docs/FULL_GUIDE.md](docs/FULL_GUIDE.md)
+> covers hardware setup, every command mode, testing, use cases,
+> troubleshooting, and a beginner glossary.
 
 ## 📖 Educational Content
 
@@ -205,45 +187,55 @@ KEY_LENGTH = 32
 ### Basic Security Assessment
 
 ```bash
-# 1. Prepare the device
-sudo ./scripts/prepare_device.sh
+# 1. Run demo mode (no Pi hardware needed)
+python3 src/main.py demo
 
-# 2. Deploy to target (with permission)
-# Physical deployment on authorized system
+# 2. Try the decryption demo
+python3 decrypt_data.py --demo --analyze
 
-# 3. Analyze results
-python3 tools/decrypt_data.py --serial YOUR_PI_SERIAL --file collected_data.enc
+# 3. Decrypt a real file (requires Pi serial)
+python3 decrypt_data.py collected_data.enc PI_SERIAL --analyze
 ```
 
 ### Educational Demonstration
 
 ```bash
-# Generate sample data for classroom demonstration
-python3 tools/generate_demo_data.py --scenario classroom
+# Interactive training mode
+python3 src/main.py train
 
-# Analyze the demo data
-python3 tools/analyze_demo.py --input demo_data.json
+# Demo mode for classrooms
+python3 src/main.py demo
 ```
 
 ## 🧪 Testing and Validation
 
-### Unit Tests
+### Unit Tests (27 real tests)
 
 ```bash
-# Run the test suite
-python3 -m pytest tests/
+# Activate virtual environment
+source .venv/bin/activate
 
-# Run specific test categories
-python3 -m pytest tests/test_encryption.py
-python3 -m pytest tests/test_payloads.py
+# Run the full test suite
+python3 -m pytest tests/ -v
+
+# Run specific test groups
+python3 -m pytest tests/test_cybersec_tool.py -k "TestEncryption" -v
+python3 -m pytest tests/test_cybersec_tool.py -k "TestOSDetection" -v
+python3 -m pytest tests/test_cybersec_tool.py -k "TestSecurity" -v
 ```
 
-### Integration Tests
+Tests cover: encryption round-trips, tamper detection, wrong-password
+rejection, OS detection with mocking, payload structure validation,
+educational content checks, and static security analysis.
 
-```bash
-# Test on virtual machines (safe environment)
-./scripts/test_on_vms.sh
-```
+> **Full testing guide:** See [docs/FULL_GUIDE.md — Section 8](docs/FULL_GUIDE.md#8-running-the-tests)
+
+## 📖 Full Documentation
+
+For a complete beginner-to-advanced walkthrough — setup, every command
+mode, use cases, troubleshooting, glossary, and roadmap — see:
+
+**[docs/FULL_GUIDE.md](docs/FULL_GUIDE.md)**
 
 ## 🤝 Contributing
 
@@ -261,8 +253,8 @@ We welcome contributions that improve the educational value of this project!
 
 ```bash
 # Fork and clone the repository
-git clone https://github.com/yourusername/pi-zero-cybersec-tool.git
-cd pi-zero-cybersec-tool
+git clone https://github.com/Ahmedouyahya/raspberry_pi.git
+cd raspberry_pi
 
 # Install development dependencies
 pip3 install -r requirements-dev.txt

@@ -18,6 +18,7 @@ License: MIT (Educational Use)
 import sys
 import platform
 import os
+import time
 import logging
 
 # Configure logging
@@ -158,7 +159,7 @@ class OSDetector:
             'os_name': self.SUPPORTED_OS.get(self.detected_os, 'Unknown OS'),
             'confidence': self.confidence,
             'system_details': self.details,
-            'detection_timestamp': platform.time.time() if hasattr(platform, 'time') else None
+            'detection_timestamp': time.time()
         }
 
 def detect_os():

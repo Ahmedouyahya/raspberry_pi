@@ -111,8 +111,14 @@ install_dependencies() {
     
     apt install -y "${packages[@]}"
     
-    # Install Python packages
-    pip3 install pycryptodomex
+    # Install Python packages from requirements.txt
+    if [[ -f "$PROJECT_ROOT/requirements.txt" ]]; then
+        log "INFO" "Installing Python packages from requirements.txt..."
+        pip3 install -r "$PROJECT_ROOT/requirements.txt"
+    else
+        log "WARN" "requirements.txt not found, installing pycryptodomex only..."
+        pip3 install pycryptodomex
+    fi
     
     log "SUCCESS" "Dependencies installed"
 }

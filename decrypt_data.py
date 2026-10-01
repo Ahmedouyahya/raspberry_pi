@@ -28,9 +28,9 @@ from typing import Dict, Any, Optional
 import logging
 
 try:
-    from Crypto.Cipher import AES
-    from Crypto.Protocol.KDF import PBKDF2
-    from Crypto.Hash import SHA256
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Protocol.KDF import PBKDF2
+    from Cryptodome.Hash import SHA256
 except ImportError:
     print("Error: pycryptodomex library required. Install with: pip3 install pycryptodomex")
     sys.exit(1)
@@ -209,13 +209,14 @@ def main():
         epilog=EDUCATIONAL_DISCLAIMER
     )
     
-    group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument(
+    parser.add_argument(
         "encrypted_file",
         nargs="?",
-        help="Path to encrypted data file"
+        default=None,
+        help="Path to encrypted data file (omit for --demo)"
     )
-    group.add_argument(
+    
+    parser.add_argument(
         "--demo",
         action="store_true",
         help="Generate and display demonstration data"
@@ -224,7 +225,8 @@ def main():
     parser.add_argument(
         "pi_serial",
         nargs="?",
-        help="Raspberry Pi serial number (password)"
+        default=None,
+        help="Raspberry Pi serial number (password for decryption)"
     )
     
     parser.add_argument(
@@ -242,6 +244,10 @@ def main():
     
     args = parser.parse_args()
     
+    # If neither a file nor --demo was given, default to --demo
+    if not args.demo and args.encrypted_file is None:
+        args.demo = True
+    
     print(EDUCATIONAL_DISCLAIMER)
     
     try:
@@ -252,7 +258,9 @@ def main():
         else:
             # Validate arguments
             if not args.pi_serial:
-                parser.error("Pi serial number required when decrypting real data")
+                print("Error: Pi serial number required when decrypting real data", file=sys.stderr)
+                print("Usage: python3 decrypt_data.py <encrypted_file> <pi_serial>", file=sys.stderr)
+                sys.exit(1)
             
             if not os.path.exists(args.encrypted_file):
                 print(f"Error: File '{args.encrypted_file}' not found", file=sys.stderr)

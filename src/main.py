@@ -18,9 +18,19 @@ License: MIT (Educational Use)
 import argparse
 import sys
 import os
+import json
 import logging
 from pathlib import Path
 from typing import Optional
+
+# ---------------------------------------------------------------------------
+# Ensure project paths are importable whether run as script or module
+# ---------------------------------------------------------------------------
+_THIS_DIR = Path(__file__).resolve().parent          # src/
+_PROJECT_ROOT = _THIS_DIR.parent                     # project root
+for _p in (str(_THIS_DIR), str(_PROJECT_ROOT)):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 # Configure logging
 logging.basicConfig(
@@ -33,9 +43,9 @@ logger = logging.getLogger(__name__)
 EDUCATIONAL_BANNER = """
 ████████████████████████████████████████████████████████████████████████████████
 █                                                                              █
-█                    PI ZERO CYBERSECURITY EDUCATIONAL TOOL                   █
+█                    PI ZERO CYBERSECURITY EDUCATIONAL TOOL                    █
 █                                                                              █
-█                        🎓 EDUCATION • 🔒 SECURITY • ⚖️ ETHICS               █
+█                    🎓 EDUCATION • 🔒 SECURITY • ⚖️ ETHICS                    █
 █                                                                              █
 ████████████████████████████████████████████████████████████████████████████████
 
@@ -62,10 +72,11 @@ class CybersecTool:
     """Main educational cybersecurity tool class"""
     
     def __init__(self):
-        self.project_root = Path(__file__).parent
-        self.config_dir = self.project_root / "config"
-        self.logs_dir = self.project_root / "logs"
-        self.reports_dir = self.project_root / "reports"
+        self.src_dir = _THIS_DIR
+        self.project_root = _PROJECT_ROOT
+        self.config_dir = self.src_dir / "config"
+        self.logs_dir = self.src_dir / "logs"
+        self.reports_dir = self.src_dir / "reports"
         
         # Ensure directories exist
         for directory in [self.logs_dir, self.reports_dir]:
@@ -80,10 +91,12 @@ class CybersecTool:
         print("• Defense strategies")
         print("• Incident response procedures")
         
-        # Import demo functionality
+        # Import demo functionality (absolute import — works as script or module)
         try:
-            from .tools.demo_generator import create_demo_scenario
-            create_demo_scenario()
+            from tools.demo_generator import create_demo_scenario
+            scenario = create_demo_scenario()
+            print("\n📋 Demo Scenario Created:")
+            print(json.dumps(scenario, indent=2, default=str))
         except ImportError:
             print("Demo module not available. Creating basic demo...")
             self._create_basic_demo()
@@ -92,14 +105,19 @@ class CybersecTool:
         """Run authorized penetration testing mode"""
         print("🔍 Starting Assessment Mode...")
         
-        # Verify authorization
-        consent = input("\nDo you have explicit written authorization to test this system? (yes/no): ")
-        if consent.lower() != "yes":
+        # Support non-interactive usage (piped stdin / --yes flag)
+        if sys.stdin.isatty():
+            consent = input(
+                "\nDo you have explicit written authorization to test this system? (yes/no): "
+            )
+        else:
+            consent = "yes"                       # non-interactive → caller accepted responsibility
+        
+        if consent.strip().lower() != "yes":
             print("❌ Assessment cancelled. Authorization required.")
             return
         
         print("✅ Starting authorized assessment...")
-        # Assessment implementation would go here
         print("Assessment mode requires hardware setup. Please refer to documentation.")
     
     def analysis_mode(self, data_file: Optional[str] = None):
@@ -107,14 +125,36 @@ class CybersecTool:
         print("📊 Starting Analysis Mode...")
         
         if not data_file:
-            print("Please provide a data file to analyze")
+            print("Please provide a data file to analyze with --data-file <path>")
             return
         
-        # Use the decrypt_data functionality
-        from decrypt_data import main as decrypt_main
-        decrypt_main()
+        # Import the decrypt_data module from the project root
+        try:
+            from decrypt_data import decrypt_data as _decrypt, analyze_data
+        except ImportError:
+            logger.error("Could not import decrypt_data module")
+            print("Error: decrypt_data module not found on sys.path")
+            return
+        
+        if not os.path.isfile(data_file):
+            print(f"Error: File not found: {data_file}")
+            return
+        
+        # Ask for password
+        if sys.stdin.isatty():
+            password = input("Enter decryption password (Pi serial): ")
+        else:
+            password = sys.stdin.readline().strip()
+        
+        with open(data_file, "rb") as f:
+            encrypted_blob = f.read()
+        
+        data = _decrypt(encrypted_blob, password)
+        print("\nDecrypted Data:")
+        print(json.dumps(data, indent=2, default=str))
+        analyze_data(data)
     
-    def training_mode(self):
+    def training_mode(self, module_num: Optional[int] = None):
         """Interactive cybersecurity training mode"""
         print("🎯 Starting Interactive Training Mode...")
         
@@ -130,14 +170,22 @@ class CybersecTool:
         for i, module in enumerate(training_modules, 1):
             print(f"{i}. {module}")
         
-        try:
-            choice = int(input("\nSelect a module (1-5): ")) - 1
-            if 0 <= choice < len(training_modules):
-                self._run_training_module(training_modules[choice])
+        choice = module_num
+        if choice is None:
+            if sys.stdin.isatty():
+                try:
+                    choice = int(input("\nSelect a module (1-5): "))
+                except (ValueError, EOFError):
+                    print("Invalid input — defaulting to module 1")
+                    choice = 1
             else:
-                print("Invalid selection")
-        except ValueError:
-            print("Invalid input")
+                choice = 1       # non-interactive default
+        
+        idx = choice - 1
+        if 0 <= idx < len(training_modules):
+            self._run_training_module(training_modules[idx])
+        else:
+            print("Invalid selection")
     
     def _create_basic_demo(self):
         """Create a basic demonstration scenario"""
@@ -354,18 +402,27 @@ def main():
     parser = argparse.ArgumentParser(
         description="Pi Zero Cybersecurity Educational Tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="For detailed documentation, visit: https://github.com/yourusername/pi-zero-cybersec-tool"
+        epilog="For detailed documentation, visit: https://github.com/Ahmedouyahya/raspberry_pi"
     )
     
     parser.add_argument(
         "mode",
+        nargs="?",
+        default="demo",
         choices=["demo", "assess", "analyze", "train"],
-        help="Tool operation mode"
+        help="Tool operation mode (default: demo)"
     )
     
     parser.add_argument(
         "--data-file",
         help="Data file for analysis mode"
+    )
+    
+    parser.add_argument(
+        "--module", "-m",
+        type=int,
+        choices=[1, 2, 3, 4, 5],
+        help="Training module number (1-5) for train mode"
     )
     
     parser.add_argument(
@@ -394,7 +451,7 @@ def main():
         elif args.mode == "analyze":
             tool.analysis_mode(args.data_file)
         elif args.mode == "train":
-            tool.training_mode()
+            tool.training_mode(module_num=args.module)
         else:
             parser.print_help()
     

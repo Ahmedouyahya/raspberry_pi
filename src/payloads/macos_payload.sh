@@ -78,16 +78,33 @@ create_safe_directory() {
 }
 
 # Safe file copy function
+# Handles locked files (e.g. SQLite WAL-mode databases open by browsers)
 copy_safe_file() {
     local source="$1"
     local destination="$2"
     local description="$3"
     
     if [[ -f "$source" ]]; then
+        # Try normal copy first
         if cp "$source" "$destination" 2>/dev/null; then
             log_message "VERBOSE" "Copied $description from $source"
+            # Also grab WAL/SHM journals for SQLite databases
+            if [[ "$source" == *.sqlite ]] || [[ "$source" == *.db ]]; then
+                cp "${source}-wal" "${destination}-wal" 2>/dev/null || true
+                cp "${source}-shm" "${destination}-shm" 2>/dev/null || true
+            fi
             return 0
         else
+            # File may be locked by the browser — try sqlite3 .dump as fallback
+            if [[ "$source" == *.sqlite ]] || [[ "$source" == *.db ]]; then
+                if command -v sqlite3 &>/dev/null; then
+                    log_message "VERBOSE" "File locked, attempting sqlite3 dump for $description"
+                    if sqlite3 "$source" ".dump" > "${destination}.sql" 2>/dev/null; then
+                        log_message "VERBOSE" "Dumped $description via sqlite3"
+                        return 0
+                    fi
+                fi
+            fi
             log_message "WARNING" "Failed to copy $description: Permission denied or file locked"
             return 1
         fi

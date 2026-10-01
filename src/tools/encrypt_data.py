@@ -19,15 +19,15 @@ License: MIT (Educational Use)
 import json
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 import logging
 from typing import Dict, Any, Optional
 
 try:
-    from Crypto.Cipher import AES
-    from Crypto.Protocol.KDF import PBKDF2
-    from Crypto.Random import get_random_bytes
-    from Crypto.Hash import SHA256
+    from Cryptodome.Cipher import AES
+    from Cryptodome.Protocol.KDF import PBKDF2
+    from Cryptodome.Random import get_random_bytes
+    from Cryptodome.Hash import SHA256
 except ImportError:
     print("Error: pycryptodomex library is required. Install with: pip3 install pycryptodomex")
     sys.exit(1)
@@ -123,7 +123,7 @@ class SecureDataHandler:
             enhanced_data = {
                 **EDUCATIONAL_DISCLAIMER,
                 "device_id": self.device_id,
-                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
                 "encryption_info": {
                     "algorithm": "AES-256-GCM",
                     "key_derivation": "PBKDF2-SHA256",
